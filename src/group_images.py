@@ -7,13 +7,13 @@ training_input_path = input('Training images folder path (must end with /): ') #
 csv_input_path = input('Training ground truth table .csv file path: ') #./resources/Task1/Training-GT.csv
 output_path = input('Output path (must end with /): ') #./resources/
 
-output_path = output_path + 'Task1/TrainingSorted'
+output_path = output_path + 'task1/training_sorted'
 output_path_benign = output_path + '/benign'
 output_path_malignant = output_path + '/malignant'
 
-os.mkdir(output_path)
-os.mkdir(output_path_benign)
-os.mkdir(output_path_malignant)
+os.makedirs(output_path)
+os.makedirs(output_path_benign)
+os.makedirs(output_path_malignant)
 
 with open(csv_input_path) as csv_file:
     csv_reader = csv.reader(csv_file, delimiter=',')
