@@ -5,9 +5,8 @@ import shutil
 print('Run with Python3')
 training_input_path = input('Training images folder path (must end with /): ') #./resources/Task1/Training/
 csv_input_path = input('Training ground truth table .csv file path: ') #./resources/Task1/Training-GT.csv
-output_path = input('Output path (must end with /): ') #./resources/
 
-output_path = output_path + 'task1/training_sorted'
+output_path = '../data/task1/training_sorted'
 output_path_benign = output_path + '/benign'
 output_path_malignant = output_path + '/malignant'
 

@@ -5,9 +5,7 @@ import pathlib
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
-print(tf.__version__)
-
-data_dir = pathlib.Path('./resources/Task1/TrainingSorted')
+data_dir = pathlib.Path('../data/task1/training_sorted')
 image_count = len(list(data_dir.glob('*/*.jpg')))
 CLASS_NAMES = np.array([item.name for item in data_dir.glob('*')])
 
