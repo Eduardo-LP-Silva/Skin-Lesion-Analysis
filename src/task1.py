@@ -4,13 +4,15 @@ import os
 import pathlib
 # import IPython.display as display
 # from PIL import Image
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 DIRECTORY = '../data/task1/training_sorted'
 IMG_WIDTH = 1022
 IMG_HEIGHT = 767
-BATCH_SIZE = 5
+BATCH_SIZE = 10
+EPOCHS = 20
+STEPS_PER_EPOCH = 50
 
 def get_label(file_path):
     # convert the path to a list of path components
@@ -64,17 +66,33 @@ def prepare_for_training(ds, cache=True, shuffle_buffer_size=1000):
     return ds
 
 def train_VGG(dataset):
-    input_tensor = tf.keras.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3), batch_size=BATCH_SIZE, dtype=tf.float32) # batch_size=30
+    input_tensor = tf.keras.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3), batch_size=BATCH_SIZE, dtype=tf.float32)
     input_tensor = tf.keras.applications.vgg16.preprocess_input(input_tensor)
-    #input_tensor = tf.reshape(input_tensor, [IMG_HEIGHT, IMG_WIDTH, 3])
     model = tf.keras.applications.VGG16(include_top=False, weights='imagenet', input_tensor=input_tensor, input_shape=(IMG_HEIGHT, IMG_WIDTH, 3), pooling='max')
+
+    '''
+    for layer in model.layers:
+	    layer.trainable = False
+    '''
+
     flat = tf.keras.layers.Flatten(data_format='channels_last')(model.outputs[0])
-    dense = tf.keras.layers.Dense(1024, activation='relu')(flat)
-    output = tf.keras.layers.Dense(2, activation='softmax')(dense)
+    #dense = tf.keras.layers.Dense(1024, activation='relu')(flat)
+    output = tf.keras.layers.Dense(2, activation='softmax')(flat)
     model = tf.keras.Model(inputs=model.inputs, outputs=output)
     model.summary()
-    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
-    history = model.fit(prepare_for_training(dataset), batch_size=BATCH_SIZE, epochs=2, verbose=1, steps_per_epoch=1000)
+    model.compile(optimizer='adam', loss='mse', metrics=["accuracy", tf.keras.metrics.Precision(), tf.keras.metrics.Recall()])
+    name = 'model_BS' + str(BATCH_SIZE) + '_E'+ str(EPOCHS) + '_SPE' + str(STEPS_PER_EPOCH)
+    history = model.fit(prepare_for_training(dataset), batch_size=BATCH_SIZE, epochs=EPOCHS, verbose=1, steps_per_epoch=STEPS_PER_EPOCH)
+    model.save('/content/drive/My Drive/Colab Notebooks/' + name)
+    plt.plot(np.arange(0, 30), history.history["loss"], label="loss")
+    plt.plot(np.arange(0, 30), history.history["accuracy"], label="accuracy")
+    plt.plot(np.arange(0, 30), history.history["precision"], label="precision")
+    plt.plot(np.arange(0, 30), history.history["recall"], label="recall")
+    plt.title("Training Metrics")
+    plt.xlabel("Epoch #")
+    plt.ylabel("Metrics")
+    plt.legend(loc="best")
+    plt.savefig('/content/drive/My Drive/Colab Notebooks/' + name + '/plot')
 
 def main() :
     data_dir = pathlib.Path(DIRECTORY)
