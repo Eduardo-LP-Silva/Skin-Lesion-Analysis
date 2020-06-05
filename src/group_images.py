@@ -1,12 +1,13 @@
 import os
 import csv
 import shutil
+import cv2 as cv
 
 print('Run with Python3')
 training_input_path = input('Training images folder path (must end with /): ') #./resources/Task1/Training/
 csv_input_path = input('Training ground truth table .csv file path: ') #./resources/Task1/Training-GT.csv
 
-output_path = '../data/task1/training_sorted'
+output_path = '../data/task1/training_sorted_resized'
 output_path_benign = output_path + '/benign'
 output_path_malignant = output_path + '/malignant'
 
@@ -19,9 +20,13 @@ with open(csv_input_path) as csv_file:
 
     for row in csv_reader:
         img_name = '/' + row[0] + '.jpg'
+        img_input_path = training_input_path + img_name
+        img = cv.imread(img_input_path)
+        resized = cv.resize(img, (224, 224), interpolation = cv.INTER_AREA)
+
         classification = row[1]
-        #print(img_name + ' - ' + classification)
+        
         if(classification == 'benign'):
-            shutil.copyfile(training_input_path + img_name, output_path_benign + img_name)
+            cv.imwrite(output_path_benign + img_name, resized)
         else:
-            shutil.copyfile(training_input_path + img_name, output_path_malignant + img_name)
+            cv.imwrite(output_path_malignant + img_name, resized)

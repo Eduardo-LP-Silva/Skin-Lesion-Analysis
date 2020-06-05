@@ -1,107 +1,98 @@
-import tensorflow as tf
-import numpy as np
-import os
-import pathlib
-# import IPython.display as display
-# from PIL import Image
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.layers import AveragePooling2D
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import utils
+from imutils import paths
 import matplotlib.pyplot as plt
+import pathlib
+import numpy as np
+import tensorflow as tf
+import cv2
+import os
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
-DIRECTORY = '../data/task1/training_sorted'
-IMG_WIDTH = 1022
-IMG_HEIGHT = 767
-BATCH_SIZE = 10
+TRAIN_DATA_DIR = '/content/drive/My Drive/Colab Notebooks/data/task1/training_sorted_resized'
+TEST_DATA_DIR = '../data/task1/testing_sorted'
+IMG_WIDTH = 224
+IMG_HEIGHT = 224
+BATCH_SIZE = 15
 EPOCHS = 20
-STEPS_PER_EPOCH = 50
 
-def get_label(file_path):
-    # convert the path to a list of path components
-    parts = tf.strings.split(file_path, os.path.sep)
-    # The second to last is the class-directory
-    return parts[-2] == CLASS_NAMES
+def load_dataset(dir):
+    print("[INFO] Loading images")
+    image_generator = tf.keras.preprocessing.image.ImageDataGenerator(validation_split=0.3)
+    train_gen = image_generator.flow_from_directory(directory=dir, color_mode='rgb', batch_size=BATCH_SIZE, shuffle=True, target_size=(IMG_HEIGHT, IMG_WIDTH), class_mode='categorical', subset='training')
+    valid_gen = image_generator.flow_from_directory(directory=dir, color_mode='rgb', batch_size=BATCH_SIZE, shuffle=True, target_size=(IMG_HEIGHT, IMG_WIDTH), class_mode='categorical', subset='validation')
 
-def decode_img(img):
-    # convert the compressed string to a 3D uint8 tensor
-    img = tf.image.decode_jpeg(img, channels=3)
-    # Use `convert_image_dtype` to convert to floats in the [0,1] range.
-    img = tf.image.convert_image_dtype(img, tf.float32)
-    return tf.image.resize(img, np.array([IMG_HEIGHT, IMG_WIDTH]))
+    return train_gen, valid_gen
 
-def process_path(file_path):
-    label = get_label(file_path)
-    # load the raw data from the file as a string
-    img = tf.io.read_file(file_path)
-    img = decode_img(img)
-    return img, label
 
-def load_dataset(data_dir):
-    list_ds = tf.data.Dataset.list_files(str(data_dir/'*/*.jpg'))
-    labeled_ds = list_ds.map(process_path, num_parallel_calls=AUTOTUNE)
-    # for image, label in labeled_ds.take(1):
-    #     print("Image shape: ", image.numpy().shape)
-    #     print("Label: ", label.numpy())
-    return labeled_ds
+# plots images with labels within jupyter notebook
+def plots(ims, figsize=(24,12), rows=4, interp=False, titles=None):
+    if type(ims[0]) is np.ndarray:
+        ims = np.array(ims).astype(np.uint8)
+        if (ims.shape[-1] != 3):
+            ims = ims.transpose((0,2,3,1))
+    f = plt.figure(figsize=figsize)
+    cols = len(ims)//rows if len(ims) % 2 == 0 else len(ims)//rows + 1
+    for i in range(len(ims)):
+        sp = f.add_subplot(rows, cols, i+1)
+        sp.axis('Off')
+        if titles is not None:
+            sp.set_title(titles[i], fontsize=32)
+        plt.imshow(ims[i], interpolation=None if interp else 'none')
 
-def prepare_for_training(ds, cache=True, shuffle_buffer_size=1000):
-  # This is a small dataset, only load it once, and keep it in memory.
-  # use `.cache(filename)` to cache preprocessing work for datasets that don't
-  # fit in memory.
-  if cache:
-    if isinstance(cache, str):
-      ds = ds.cache(cache)
-    else:
-      ds = ds.cache()
+def build_model():
+    print("[INFO] Building model")
+    input_layer = tf.keras.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3))
+    input_tensor = tf.keras.applications.vgg16.preprocess_input(input_layer)
+    print(input_layer)
+    print(input_tensor)
+    baseModel = VGG16(weights='imagenet', include_top=True, input_shape=(IMG_HEIGHT, IMG_WIDTH, 3), input_tensor=input_tensor)
 
-    ds = ds.shuffle(buffer_size=shuffle_buffer_size)
+    model = tf.keras.Sequential()
 
-    # Repeat forever
-    ds = ds.repeat()
-
-    ds = ds.batch(BATCH_SIZE)
-
-    # `prefetch` lets the dataset fetch batches in the background while the model
-    # is training.
-    ds = ds.prefetch(buffer_size=AUTOTUNE)
-
-    return ds
-
-def train_VGG(dataset):
-    input_tensor = tf.keras.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3), batch_size=BATCH_SIZE, dtype=tf.float32)
-    input_tensor = tf.keras.applications.vgg16.preprocess_input(input_tensor)
-    model = tf.keras.applications.VGG16(include_top=False, weights='imagenet', input_tensor=input_tensor, input_shape=(IMG_HEIGHT, IMG_WIDTH, 3), pooling='max')
-
-    '''
-    for layer in model.layers:
-	    layer.trainable = False
-    '''
-
-    flat = tf.keras.layers.Flatten(data_format='channels_last')(model.outputs[0])
-    #dense = tf.keras.layers.Dense(1024, activation='relu')(flat)
-    output = tf.keras.layers.Dense(2, activation='softmax')(flat)
-    model = tf.keras.Model(inputs=model.inputs, outputs=output)
+    for layer in baseModel.layers[:-1]:
+      layer.trainable = False #Better results when vgg layers are frozen (only in imagenet)
+      model.add(layer)
+    
+    model.add(tf.keras.layers.Dropout(0.2))
+    model.add(tf.keras.layers.Dense(2, activation='softmax'))
     model.summary()
-    model.compile(optimizer='adam', loss='mse', metrics=["accuracy", tf.keras.metrics.Precision(), tf.keras.metrics.Recall()])
-    name = 'model_BS' + str(BATCH_SIZE) + '_E'+ str(EPOCHS) + '_SPE' + str(STEPS_PER_EPOCH)
-    history = model.fit(prepare_for_training(dataset), batch_size=BATCH_SIZE, epochs=EPOCHS, verbose=1, steps_per_epoch=STEPS_PER_EPOCH)
-    model.save('/content/drive/My Drive/Colab Notebooks/' + name)
-    plt.plot(np.arange(0, 30), history.history["loss"], label="loss")
-    plt.plot(np.arange(0, 30), history.history["accuracy"], label="accuracy")
-    plt.plot(np.arange(0, 30), history.history["precision"], label="precision")
-    plt.plot(np.arange(0, 30), history.history["recall"], label="recall")
-    plt.title("Training Metrics")
-    plt.xlabel("Epoch #")
-    plt.ylabel("Metrics")
-    plt.legend(loc="best")
-    plt.savefig('/content/drive/My Drive/Colab Notebooks/' + name + '/plot')
+    
+    return model
 
-def main() :
-    data_dir = pathlib.Path(DIRECTORY)
-    image_count = len(list(data_dir.glob('*/*.jpg')))
-    global CLASS_NAMES 
-    CLASS_NAMES = np.array([item.name for item in data_dir.glob('*')])
-    dataset = load_dataset(data_dir)
-    train_VGG(dataset)
+def train_model(model, train_gen, val_gen):
+    print("[INFO] Training model")
+    model.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001), metrics=['accuracy', tf.keras.metrics.Precision(), tf.keras.metrics.Recall()])
 
+    H = model.fit(x=train_gen, validation_data=val_gen, batch_size=BATCH_SIZE, validation_batch_size=BATCH_SIZE, epochs=EPOCHS, verbose=1)
+    return model, H
 
-if __name__ == "__main__":
-    main()
+train_gen, valid_gen = load_dataset(TRAIN_DATA_DIR)
+
+'''
+imgs, labels = next(train_gen)
+plots(imgs, titles=labels)
+'''
+
+model = build_model()
+model, history = train_model(model, train_gen, valid_gen)
+name = 'model_BS' + str(BATCH_SIZE) + '_E'+ str(EPOCHS)
+model.save('/content/drive/My Drive/Colab Notebooks/' + name)
+
+plt.plot(np.arange(0, 30), history.history["loss"], label="loss")
+plt.plot(np.arange(0, 30), history.history["accuracy"], label="accuracy")
+#plt.plot(np.arange(0, 30), history.history["precision"], label="precision")
+plt.plot(np.arange(0, 30), history.history["recall"], label="recall")
+plt.title("Training Metrics")
+plt.xlabel("Epoch #")
+plt.ylabel("Metrics")
+plt.legend(loc="best")
+plt.savefig('/content/drive/My Drive/Colab Notebooks/' + name + '/plot')
