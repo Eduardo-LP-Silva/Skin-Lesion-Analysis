@@ -25,14 +25,15 @@ TRAIN_DATA_DIR = '/content/drive/My Drive/Colab Notebooks/data/task1/training_so
 TEST_DATA_DIR = '/content/drive/My Drive/Colab Notebooks/data/task1/test_sorted_resized'
 IMG_WIDTH = 224
 IMG_HEIGHT = 224
-BATCH_SIZE = 15
-EPOCHS = 5
+BATCH_SIZE = 30
+EPOCHS = 100
+NAME = 'NONE_ALL_100'
 
 def load_dataset(train=True):
     print("[INFO] Loading images")
     
     if train:
-      image_generator = tf.keras.preprocessing.image.ImageDataGenerator(validation_split=0.1)
+      image_generator = tf.keras.preprocessing.image.ImageDataGenerator(validation_split=0.2)
       train_gen = image_generator.flow_from_directory(directory=TRAIN_DATA_DIR, color_mode='rgb', batch_size=BATCH_SIZE, shuffle=True, target_size=(IMG_HEIGHT, IMG_WIDTH), class_mode='categorical', subset='training')
       valid_gen = image_generator.flow_from_directory(directory=TRAIN_DATA_DIR, color_mode='rgb', batch_size=BATCH_SIZE, shuffle=True, target_size=(IMG_HEIGHT, IMG_WIDTH), class_mode='categorical', subset='validation')
       return train_gen, valid_gen
@@ -82,7 +83,7 @@ def build_model():
     print("[INFO] Building model")
     input_layer = tf.keras.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3))
     input_tensor = tf.keras.applications.vgg16.preprocess_input(input_layer)
-    baseModel = VGG16(weights='imagenet', include_top=True, input_shape=(IMG_HEIGHT, IMG_WIDTH, 3), input_tensor=input_tensor)
+    baseModel = VGG16(weights=None, include_top=True, input_shape=(IMG_HEIGHT, IMG_WIDTH, 3), input_tensor=input_tensor)
 
     model = tf.keras.Sequential()
 
@@ -93,7 +94,7 @@ def build_model():
     '''
     layer_no = len(model.layers) - 1
 
-    for i in range(layer_no, layer_no - 4, -1):
+    for i in range(layer_no, layer_no - 2, -1):
       model.layers[i].trainable = True
     '''
     
@@ -142,26 +143,47 @@ def get_generator_data(gen, batch_size):
 
   return images, labels
 
+
+def plot_confusion_matrix(cm, classes):
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title('Confusion matrix')
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+    thresh = cm.max() / 2.
+
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, cm[i, j],
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('Actual Values')
+    plt.xlabel('Predicted Values')
+    plt.savefig('/content/drive/My Drive/Colab Notebooks/' + NAME + '_cm.png')
+
 train_gen, valid_gen = load_dataset(True)
 
 imgs, labels = next(train_gen)
-plots(imgs, titles=np.argmax(labels, axis=1), keys=list(train_gen.class_indices.keys()))
+
+if BATCH_SIZE <= 28:
+  plots(imgs, titles=np.argmax(labels, axis=1), keys=list(train_gen.class_indices.keys()))
 
 model = build_model()
 model, history = train_model(model, train_gen, valid_gen)
-name = 'model_BS' + str(BATCH_SIZE) + '_E'+ str(EPOCHS)
-#model.save('/content/drive/My Drive/Colab Notebooks/' + name)
+#model.save('/content/drive/My Drive/Colab Notebooks/' + NAME)
 
 plt.plot(np.arange(0, EPOCHS), history.history["loss"], label="loss")
-plt.plot(np.arange(0, EPOCHS), history.history["accuracy"], label="accuracy", )
-#plt.plot(np.arange(0, 30), history.history["precision"], label="precision")
-#plt.plot(np.arange(0, EPOCHS), history.history["recall"], label="recall")
-plt.ylim(0, 1)
+plt.plot(np.arange(0, EPOCHS), history.history["accuracy"], label="accuracy")
+#plt.plot(np.arange(0, EPOCHS), history.history["val_loss"], label="Validation Loss")
+plt.plot(np.arange(0, EPOCHS), history.history["val_accuracy"], label="Validation Accuracy")
+plt.ylim(0, 1.05)
 plt.title("Training Metrics")
 plt.xlabel("Epoch #")
 plt.ylabel("Metrics")
 plt.legend(loc="best")
-#plt.savefig('/content/drive/My Drive/Colab Notebooks/' + name + '/plot')
+plt.savefig('/content/drive/My Drive/Colab Notebooks/' + NAME + '_plot.png')
 
 test_gen = load_dataset(False)
 
@@ -175,15 +197,26 @@ round_labels = np.argmax(test_labels, axis=1)
 print(round_predictions)
 print(round_labels)
 
-'''
 confusion_mtx = confusion_matrix(round_labels, round_predictions)
-cm_plot_labels = test_gen.class_indices.keys()
-plot_confusion_matrix(confusion_matrix, classes=range(2))
-'''
+print(str(confusion_mtx))
+plot_confusion_matrix(confusion_mtx, list(test_gen.class_indices.keys()))
 
-plots(test_images[0:9], titles=round_labels, predictions=round_predictions, keys=list(train_gen.class_indices.keys()))
+if BATCH_SIZE <= 28:
+  plots(test_images[0:9], titles=round_labels, predictions=round_predictions, keys=list(train_gen.class_indices.keys()))
 
-print("Accuracy: ", accuracy_score(round_labels, round_predictions))
-print("Precision: ", precision_score(round_labels, round_predictions, average="micro"))
-print('Recall (Sensitivitiy): ', recall_score(round_labels, round_predictions, average="macro"))
-print('F1 score: ', f1_score(round_labels, round_predictions, average="weighted"))
+test_acc = accuracy_score(round_labels, round_predictions)
+test_prec = precision_score(round_labels, round_predictions, average="macro")
+test_rec = recall_score(round_labels, round_predictions, average="macro")
+test_f1 = f1_score(round_labels, round_predictions, average="macro")
+
+print("Accuracy: ", test_acc)
+print("Precision: ", test_prec)
+print('Recall: ', test_rec)
+print('F1 Score: ', test_f1)
+
+pos = np.arange(4)
+plt.bar(pos, [test_acc, test_prec, test_rec, test_f1], align='center')
+plt.xticks(pos, ['Accuracy', 'Precision', 'Recall', 'F1 Score'])
+plt.title('Test Metrics')
+plt.ylim(0, 1)
+plt.savefig('/content/drive/My Drive/Colab Notebooks/' + NAME + '_test_metrics.png')
