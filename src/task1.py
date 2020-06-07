@@ -10,7 +10,6 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import utils
 from imutils import paths
 from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix, roc_curve, auc, accuracy_score, precision_recall_fscore_support
-from mlxtend.plotting import plot_confusion_matrix
 import itertools
 import matplotlib.pyplot as plt
 import pathlib

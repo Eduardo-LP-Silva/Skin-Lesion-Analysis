@@ -1,6 +1,5 @@
 import os
 import csv
-import shutil
 import cv2 as cv
 
 print('Run with Python3')
