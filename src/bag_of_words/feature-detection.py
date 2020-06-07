@@ -37,10 +37,6 @@ VARS_TRAIN_PATH = 'train.pkl'
 
 db = Database(IMG_PATH, ANNOT_PATH)
 
-labels = {
-    'lower_bound': 0,
-    'upper_bound': 10, #900
-}
 
 labels_train = {
     'lower_bound': 0,
@@ -48,8 +44,8 @@ labels_train = {
 }
 
 labels_test = {
-    'lower_bound': 0,
-    'upper_bound': 10, #900
+    'lower_bound': 16,
+    'upper_bound': 22, #900
 }
 
 keys = {
@@ -75,15 +71,15 @@ def main():
             quit()
 
     print('Starting computing descriptors')
-    i = labels['lower_bound']
-    file_it = labels['lower_bound']
-    while i < labels['upper_bound'] :
+    file_it = labels_train['lower_bound']
+    i = 0
+    while file_it < labels_train['upper_bound'] :
         try:
             label = 'ISIC_'
             file_it = file_it + 1
             name = label + str(file_it).zfill(7)
             img = db.read_img(name)
-            print('Computing descriptors for ' + str(label) + str(file_it).zfill(7) + ' of ' + str(labels['upper_bound']))
+            print('Computing descriptors for ' + str(label) + str(file_it).zfill(7) + ' of ' + str(labels_train['upper_bound']))
             img = gray(img)
             img = resize_img(img)
             feature = get_key_points(img)
@@ -93,6 +89,29 @@ def main():
             i = i + 1
         except:
             continue
+    labels_train['upper_bound'] = i
+
+    file_it = labels_test['lower_bound']
+    while file_it < labels_test['upper_bound'] :
+        try:
+            label = 'ISIC_'
+            file_it = file_it + 1
+            name = label + str(file_it).zfill(7)
+            img = db.read_img(name)
+            print('Computing descriptors for ' + str(label) + str(file_it).zfill(7) + ' of ' + str(labels_test['upper_bound']))
+            img = gray(img)
+            img = resize_img(img)
+            feature = get_key_points(img)
+            features.append((name, img, feature))
+            if DESC:
+                descriptors.extend(feature[1])
+            i = i + 1
+        except:
+            continue
+    labels_test['lower_bound'] = labels_train['upper_bound']
+    labels_test['upper_bound'] = i
+
+
     print('Finished computing descriptors')
     print('Storing descriptors')
     store_object(descriptors, DESC_PATH)
@@ -125,7 +144,6 @@ def main():
     for name, img, feature in features:
             X.append(bow_extract(extractor, img, feature[0])[0])
             y.append(1 if keys[name] == 'malignant' else 0)
-            i = i + 1
     print('Finish computing target variables')
 
     svm = None
