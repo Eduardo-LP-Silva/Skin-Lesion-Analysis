@@ -3,7 +3,7 @@ import csv
 import random
 import argparse
 from shared import *
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, f1_score, recall_score, precision_score
 sys.path.append('..')
 
 
@@ -40,12 +40,12 @@ db = Database(IMG_PATH, ANNOT_PATH)
 
 labels_train = {
     'lower_bound': 0,
-    'upper_bound': 10, #900
+    'upper_bound': 30, #900
 }
 
 labels_test = {
-    'lower_bound': 16,
-    'upper_bound': 22, #900
+    'lower_bound': 40,
+    'upper_bound': 60, #900
 }
 
 keys = {
@@ -176,12 +176,22 @@ def main():
         pred = np.squeeze(test_svm(svm, X_test)[1].astype(int))
         print('Finished testing model')
 
-        print('Confusion Matrix: \n' + str(confusion_matrix(y_test,pred)))
+        cm = confusion_matrix(y_test,pred)
+        print('Confusion Matrix: \n' + str(cm))
         correct = 0
         for i in range(len(y_test)):
             if y_test[i] == pred[i]:
                 correct += 1
-        print('Accuracy: ', str(correct/len(y_test)*100), '%')
+
+        accuracy = correct/len(y_test)*100
+        precision = cm[0][0]/(cm[0][0] + cm[1][0])*100
+        recall = cm[0][0]/(cm[0][0] + cm[0][1])*100
+        f1 = 2 * precision * recall / (precision + recall)
+
+        print('Accuracy : ', accuracy, '%')
+        print('Precision: ', precision, '%')
+        print('Recall   : ', recall, '%')
+        print('F1       : ', f1)
 
 if __name__ == "__main__":
     main()
