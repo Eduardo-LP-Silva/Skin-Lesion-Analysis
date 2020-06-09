@@ -160,3 +160,53 @@ imgs, labels = next(train_gen)
 
 if BATCH_SIZE <= 28:
   plots(imgs, titles=np.argmax(labels, axis=1), keys=classes)
+
+model = build_model(len(classes))
+model, history = train_model(model, train_gen, valid_gen)
+model.save('/content/drive/My Drive/Colab Notebooks/' + NAME)
+
+plt.plot(np.arange(0, EPOCHS), history.history["loss"], label="loss")
+plt.plot(np.arange(0, EPOCHS), history.history["accuracy"], label="accuracy")
+plt.plot(np.arange(0, EPOCHS), history.history["val_accuracy"], label="Validation Accuracy")
+plt.ylim(0, 1.05)
+plt.title("Training Metrics")
+plt.xlabel("Epoch #")
+plt.ylabel("Metrics")
+plt.legend(loc="best")
+plt.savefig('/content/drive/My Drive/Colab Notebooks/' + NAME + '_plot.png')
+
+test_gen = load_dataset(False)
+
+test_images, test_labels = get_generator_data(test_gen, BATCH_SIZE)
+print(test_labels)
+
+predictions = test_model(model, test_gen)
+
+round_predictions = np.argmax(predictions, axis=1)
+round_labels = np.argmax(test_labels, axis=1)
+print(round_predictions)
+print(round_labels)
+
+confusion_mtx = confusion_matrix(round_labels, round_predictions)
+print(str(confusion_mtx))
+plot_confusion_matrix(confusion_mtx, classes)
+
+if BATCH_SIZE <= 28:
+  plots(test_images[0:9], titles=round_labels, predictions=round_predictions, keys=classes)
+
+test_acc = accuracy_score(round_labels, round_predictions)
+test_prec = precision_score(round_labels, round_predictions, average="macro")
+test_rec = recall_score(round_labels, round_predictions, average="macro")
+test_f1 = f1_score(round_labels, round_predictions, average="macro")
+
+print("Accuracy: ", test_acc)
+print("Precision: ", test_prec)
+print('Recall: ', test_rec)
+print('F1 Score: ', test_f1)
+
+pos = np.arange(4)
+plt.bar(pos, [test_acc, test_prec, test_rec, test_f1], align='center')
+plt.xticks(pos, ['Accuracy', 'Precision', 'Recall', 'F1 Score'])
+plt.title('Test Metrics')
+plt.ylim(0, 1)
+plt.savefig('/content/drive/My Drive/Colab Notebooks/' + NAME + '_test_metrics.png')
