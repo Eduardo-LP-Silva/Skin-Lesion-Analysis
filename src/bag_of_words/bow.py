@@ -1,6 +1,5 @@
 import sys
 import csv
-import random
 import argparse
 from utils import *
 from sklearn.metrics import confusion_matrix, f1_score, recall_score, precision_score
