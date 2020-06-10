@@ -1,3 +1,6 @@
 /resources
 /data
 /.vscode
+*.json
+*.csv
+src/bag_of_words/images/
