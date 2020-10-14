@@ -1,8 +1,5 @@
 # Skin Lesion Analysis
- Project developed in the scope of FEUP's Computer Vision course unit.
+Compilation of methods for the automatic classification of skin lesions from dermoscopic images. Approaches used include:
 
-## Dependencies
-
-* Python3
-* TensorFlow 2.0
-* IPython
+* Bag-of-Words
+* Modified VGG16 CNN using Keras / TensorFlow
